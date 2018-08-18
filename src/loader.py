@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 # Turn this off to check local and global accuracy
-do_train       = True
+do_train       = False
 
 do_overfit     = True
 do_eval        = True

@@ -3,6 +3,7 @@ b3.tif
 b4.tif
 b5.tif
 training.tif
+events.out.tfevents.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
