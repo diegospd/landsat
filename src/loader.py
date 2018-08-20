@@ -11,6 +11,7 @@ do_overfit     = True
 do_eval        = True
 
 epochs = 1000
+class_sample_size = 300
 
 
 # Don't mess with these! 
@@ -20,19 +21,6 @@ submap_length = 64
 batch_size = 32
 dropout_rate = 0.4
 learning_rate = 1e-4
-
-# Obsolete
-# amount of random tests 
-# validation_examples = 100
-# Proportion of random points to take for training
-# Total amount of observations: 33,183,691
-# NOTE: Using 180 of each for now
-training_ratio = 1e-5
-# Make sure to use at least this amount of
-# datapoints for each class during training.
-# NOTE: Using 180 of each for now
-min_class_size = 100
-
 
 def build_layers(features, mode):
     input_layer = tf.cast(features, tf.float32)
@@ -74,7 +62,6 @@ def my_model_fn(features, labels, mode, params):
     # Softmax output of the neural network.
     logits = build_layers(features, mode)
     y_pred = tf.nn.softmax(logits=logits)
-    # logits = tf.reshape(logits, [None] + logits.shape)
     print('entropy logits', logits.shape)
     print('y_pred', y_pred.shape)
     
@@ -131,7 +118,7 @@ def my_model_fn(features, labels, mode, params):
 #-------------------------------------------------------------------------------------------
 #      Labels preprocessing
 #-------------------------------------------------------------------------------------------
-def preprocess_labels():
+def preprocess_labels(map):
     """ Loads labeled data from disk.
     Writes training and validation datasets to disk.
     Returns training dataset as a tensor of tuples (x,y,value)
@@ -140,7 +127,7 @@ def preprocess_labels():
     train = train.reshape(train.shape[1:])
     half = submap_length // 2
     train = np.pad(train, ((half, half), (half, half)), 'constant')
-    train = flatten_training(train) # [(x,y,nonzero)]
+    train = flatten_training(train, map) # [(x,y,nonzero)]
     labels, test = smart_shuffle(train)
     print('Using', len(labels), ' training points...\n\n')
     np.save('../train_labels.npy', labels)
@@ -152,18 +139,8 @@ def smart_shuffle(labels):
     of observations for each class"""
     
     def taker(ls):
-        return ls[:180], ls[-10:]
-        # n = int(len(ls) * training_ratio)
-        # if n <= min_class_size:
-        #     print("WARNING! Taking too few samples. Increase training_ratio")
-        #     print("Original:", len(ls), "Took:", n)
-        #     if ls:
-        #         print("Class value", ls[0][2])
-        #     # sys.exit(1)
-        #     print("WARNING! I'll use the first",min_class_size, "items")
-        #     n = min_class_size
-
-        # return ls[:n], ls[n:]
+        "Only keep 10 unseen samples from each class as test set"
+        return ls[:class_sample_size], ls[-10:]
 
     train = []
     test = []
@@ -173,16 +150,15 @@ def smart_shuffle(labels):
         left, right = taker(b)
         train += left
         test += right
-    # Only keep 10 unseen samples from each class as test set
-    return np.array(train), np.array(test[:10])
+    return np.array(train), np.array(test)
 
 
-def flatten_training(train):
+def flatten_training(train, map):
     x,y = train.shape
     flat = []
     for i in range(x):
         for j in range(y):
-            if train[i][j]:
+            if train[i,j] and map[i,j].any():
                 flat.append((i,j,train[i,j]))
     return flat
 
@@ -241,10 +217,6 @@ def input_fn_train(map, labels, shuffle=False):
 
 def input_fn_validation(map):
     labels = np.load('../validation_labels.npy')
-    buckets = segregate(labels, lambda x: x[-1])
-    labels = []
-    for b in buckets:
-        labels += b[:10]
     return input_fn_train(map, labels)
 
 
@@ -270,20 +242,21 @@ def load_data():
 
 if __name__ == '__main__':
     
+    print('loading data... (please extract data/*.tar.gz first)')
+    map = load_data()
+    print('map.shape', map.shape)
+
     if rebuild_labels:
         print("processing labels... (Memory intensive, 1 core)")
-        labels = preprocess_labels()
+        labels = preprocess_labels(map)
     else:
         print('load labels...')
         labels = np.load('../train_labels.npy')
     print('labels.shape', labels.shape)
     
 
-    print('load data...')
-    map = load_data()
-    print('map.shape', map.shape)
-
     print('\n\n\n')
+
 
     tf.logging.set_verbosity(tf.logging.INFO)
     params = {'learning_rate': learning_rate}
@@ -309,10 +282,3 @@ if __name__ == '__main__':
         result = classifier.evaluate(input_fn=input_fn_validation(map))
         print('\n\n\n', result)
         print("\n\n\nClassification accuracy: {0:.2%}\n\n".format(result["accuracy"]))
-
-
-
-
-
-
-
