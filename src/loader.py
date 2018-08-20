@@ -5,22 +5,21 @@ import numpy as np
 import tensorflow as tf
 
 # Turn this off to check local and global accuracy
-do_train       = False
+do_train   = False
 
-do_overfit     = True
-do_eval        = True
+do_overfit = True
+do_eval    = True
 
-epochs = 1000
-class_sample_size = 300
-
+epochs        = 1000
+dropout_rate  = 0.25
+learning_rate = 1e-4
 
 # Don't mess with these! 
 # Changing them redefines the graph
-rebuild_labels = False
-submap_length = 64
-batch_size = 32
-dropout_rate = 0.4
-learning_rate = 1e-4
+rebuild_labels    = False
+class_sample_size = 300
+submap_length     = 64
+batch_size        = 32
 
 def build_layers(features, mode):
     input_layer = tf.cast(features, tf.float32)
@@ -56,8 +55,6 @@ def build_layers(features, mode):
 def my_model_fn(features, labels, mode, params):
     labels = tf.cast(labels, tf.int32)
     print('entropy labels', labels.shape)
-    # labels = tf.reshape(labels, [-1])
-    # print('entropy labels', labels.shape)
 
     # Softmax output of the neural network.
     logits = build_layers(features, mode)
@@ -196,13 +193,10 @@ def get_submap(map, x, y):
 
 def input_fn_train(map, labels, shuffle=False):
     x = np.array([get_submap(map, d[0], d[1]) for d in labels])
-    # x = x.reshape((len(labels), submap_length, submap_length, map.shape[2]))
     if len (x.shape) < 2:
         print("\n\n\n WARNING! Please rebuild the labels for submap_length", submap_length)
         sys.exit(1)
-    print('....', x.shape)
     y = np.array([ d[2] - 1 for d in labels])
-    # y = np.array([ to_one_hot(d[2]) for d in labels])
 
     print('input x', x.shape)
     print('INPUT Y', y.shape)
@@ -272,8 +266,8 @@ if __name__ == '__main__':
 
     if do_overfit:
         overfit = classifier.evaluate(
-            input_fn=input_fn_train(map, labels, shuffle=False),
-            steps=100
+            input_fn=input_fn_train(map, labels, shuffle=True),
+            steps=4
             )
         print('\n\n\n',overfit)
         print("Overfit accuracy: {0:.2%}\n\n".format(overfit["accuracy"]))
