@@ -1,1 +1,1 @@
-# TensorFlow model for terrain classification from satellital images
+# TensorFlow model for terrain classification
